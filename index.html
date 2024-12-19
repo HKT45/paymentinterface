@@ -1,107 +1,69 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-void main() => runApp(PhonePePaymentApp());
-
-class PhonePePaymentApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: PaymentPage(),
-    );
-  }
-}
-
-class PaymentPage extends StatefulWidget {
-  @override
-  _PaymentPageState createState() => _PaymentPageState();
-}
-
-class _PaymentPageState extends State<PaymentPage> {
-  bool isProcessing = false;
-
-  Future<void> initiatePayment() async {
-    setState(() {
-      isProcessing = true;
-    });
-
-    // Replace this with your backend API URL
-    const backendUrl = 'https://your-backend-url.com/initiate-payment';
-
-    final response = await http.post(
-      Uri.parse(backendUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'amount': 50000, // Amount in smallest unit (e.g., 50000 = ₹500)
-        'currency': 'INR',
-        'merchantTransactionId': 'txn_${DateTime.now().millisecondsSinceEpoch}',
-        'merchantUserId': 'user123',
-        'callbackUrl': 'https://your-backend-url.com/payment-callback',
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final deepLink = data['deepLink'];
-
-      if (deepLink != null) {
-        // Launch the PhonePe app using the deep link
-        await launchPhonePeApp(deepLink);
-      } else {
-        showError('Failed to get payment link.');
-      }
-    } else {
-      showError('Failed to initiate payment.');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhonePe Payment</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
     }
-
-    setState(() {
-      isProcessing = false;
-    });
-  }
-
-  Future<void> launchPhonePeApp(String deepLink) async {
-    try {
-      if (await canLaunch(deepLink)) {
-        await launch(deepLink);
-      } else {
-        showError('Unable to launch PhonePe.');
-      }
-    } catch (e) {
-      showError('Error launching PhonePe: $e');
+    #payment-result {
+      margin-top: 20px;
+      font-size: 18px;
     }
-  }
+    button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <h1>PhonePe Payment Gateway</h1>
+  <p>Click the button below to initiate a payment using PhonePe.</p>
 
-  void showError(String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+  <button id="payButton">Pay with PhonePe</button>
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('PhonePe Payment'),
-      ),
-      body: Center(
-        child: isProcessing
-            ? CircularProgressIndicator()
-            : ElevatedButton(
-                onPressed: initiatePayment,
-                child: Text('Pay with PhonePe'),
-              ),
-      ),
-    );
-  }
-}
+  <div id="payment-result"></div>
+
+  <script>
+    document.getElementById('payButton').addEventListener('click', async () => {
+      try {
+        // Call your backend to initiate payment and get the deep link
+        const response = await fetch('https://your-backend-url.com/initiate-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 50000, // Amount in smallest currency unit (e.g., 50000 = ₹500)
+            currency: 'INR',
+            merchantTransactionId: `txn_${Date.now()}`,
+            merchantUserId: 'user123',
+            callbackUrl: 'https://your-backend-url.com/payment-callback',
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.deepLink) {
+          // Redirect the user to the PhonePe app
+          window.location.href = data.deepLink;
+        } else {
+          document.getElementById('payment-result').textContent = 'Failed to initiate payment. Try again!';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('payment-result').textContent = 'An error occurred. Check the console for details.';
+      }
+    });
+  </script>
+</body>
+</html>
