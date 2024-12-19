@@ -1,0 +1,107 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+void main() => runApp(PhonePePaymentApp());
+
+class PhonePePaymentApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: PaymentPage(),
+    );
+  }
+}
+
+class PaymentPage extends StatefulWidget {
+  @override
+  _PaymentPageState createState() => _PaymentPageState();
+}
+
+class _PaymentPageState extends State<PaymentPage> {
+  bool isProcessing = false;
+
+  Future<void> initiatePayment() async {
+    setState(() {
+      isProcessing = true;
+    });
+
+    // Replace this with your backend API URL
+    const backendUrl = 'https://your-backend-url.com/initiate-payment';
+
+    final response = await http.post(
+      Uri.parse(backendUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'amount': 50000, // Amount in smallest unit (e.g., 50000 = ₹500)
+        'currency': 'INR',
+        'merchantTransactionId': 'txn_${DateTime.now().millisecondsSinceEpoch}',
+        'merchantUserId': 'user123',
+        'callbackUrl': 'https://your-backend-url.com/payment-callback',
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final deepLink = data['deepLink'];
+
+      if (deepLink != null) {
+        // Launch the PhonePe app using the deep link
+        await launchPhonePeApp(deepLink);
+      } else {
+        showError('Failed to get payment link.');
+      }
+    } else {
+      showError('Failed to initiate payment.');
+    }
+
+    setState(() {
+      isProcessing = false;
+    });
+  }
+
+  Future<void> launchPhonePeApp(String deepLink) async {
+    try {
+      if (await canLaunch(deepLink)) {
+        await launch(deepLink);
+      } else {
+        showError('Unable to launch PhonePe.');
+      }
+    } catch (e) {
+      showError('Error launching PhonePe: $e');
+    }
+  }
+
+  void showError(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('PhonePe Payment'),
+      ),
+      body: Center(
+        child: isProcessing
+            ? CircularProgressIndicator()
+            : ElevatedButton(
+                onPressed: initiatePayment,
+                child: Text('Pay with PhonePe'),
+              ),
+      ),
+    );
+  }
+}
